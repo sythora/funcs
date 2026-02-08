@@ -1664,42 +1664,48 @@ do
     end
 end
 
--- only define once
-if not getgenv().decompile then
-    getgenv().decompile = function(script)
-        -- argument validation
-        assert(
-            typeof(script) == "Instance"
-            and (
-                script.ClassName == "ModuleScript"
-                or script.ClassName == "LocalScript"
-                or script.ClassName == "Script"
-            ),
-            "Invalid argument #1 to 'decompile', LuaSourceContainer expected"
-        )
+assert(getscriptbytecode, "Exploit not supported.")
 
-        -- get bytecode
-        local bytecode = getscriptbytecode(script)
-        assert(type(bytecode) == "string", "Failed to get script bytecode")
+local API: string = "http://api.plusgiant5.com"
 
-        -- HTTP request (yields safely)
-        local response = request({
-            Url = "http://api.plusgiant5.com/konstant/decompile",
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "text/plain"
-            },
-            Body = bytecode
-        })
+local last_call = 0
+local function call(konstantType: string, scriptPath: Script | ModuleScript | LocalScript): string
+    local success: boolean, bytecode: string = pcall(getscriptbytecode, scriptPath)
 
-        -- response validation
-        assert(type(response) == "table", "Invalid response from request")
-        assert(type(response.Body) == "string", "Invalid response body")
+    if (not success) then
+        return `-- Failed to get script bytecode, error:\n\n--[[\n{bytecode}\n--]]`
+    end
 
-        return response.Body
+    local time_elapsed = os.clock() - last_call
+    if time_elapsed <= .5 then
+        task.wait(.5 - time_elapsed)
+    end
+    local httpResult = request({
+        Url = API .. konstantType,
+        Body = bytecode,
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "text/plain"
+        },
+    })
+    last_call = os.clock()
+    
+    if (httpResult.StatusCode ~= 200) then
+        return `-- Error occured while requesting the API, error:\n\n--[[\n{httpResult.Body}\n--]]`
+    else
+        return httpResult.Body
     end
 end
 
-return getgenv().decompile
-
+local function decompile(scriptPath: Script | ModuleScript | LocalScript): string
+    return call("/konstant/decompile", scriptPath)
 end
+
+local function disassemble(scriptPath: Script | ModuleScript | LocalScript): string
+    return call("/konstant/disassemble", scriptPath)
+end
+
+getgenv().decompile = decompile
+getgenv().disassemble = disassemble
+
+-- by lovrewe
