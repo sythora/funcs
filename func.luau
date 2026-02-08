@@ -1,4 +1,4 @@
-do
+
     local function set_readonly_safe(tbl, state)
         if setreadonly then
             pcall(setreadonly, tbl, state)
